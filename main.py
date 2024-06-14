@@ -24,6 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 import openai
+from starlette.config import Config
+config = Config(".env")
+open_ai_key = config("OPEN_AI_KEY", cast=str)
 
 
 # Set seed for reproducibility
@@ -65,8 +68,15 @@ async def transcribe_audio(file: UploadFile = File(...)):
                     detected_language_code = detect(transcription)
                     detected_language = langcodes.Language.get(detected_language_code).display_name()
 
-                    openairesponse =call_openai(translated_text,detected_language)
+                    openairesponse =call_openai(translated_text)
 
+                    if(openairesponse):
+
+                        convertedtext= convertTextToDetectedLanguage(openairesponse,detected_language,lang)
+
+                    
+
+                    
                     
 
                     return JSONResponse(
@@ -74,7 +84,8 @@ async def transcribe_audio(file: UploadFile = File(...)):
                     content={"transcription": transcription,
                               "translatedtext":translated_text,
                               "openai":openairesponse,
-                              "detectedlanguage":detected_language}
+                              "detectedlanguage":detected_language,
+                              "convertedtext":convertedtext}
                     )
                 except sr.UnknownValueError:
                     # Continue to the next language
@@ -86,7 +97,29 @@ async def transcribe_audio(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Could not request results; {e}")
 
 
-def call_openai(user_prompt,detected_language):
+
+def convertTextToDetectedLanguage(openairesponse,detected_language,lang):
+
+    paragraphs = openairesponse.split('\n\n')
+    # Check the number of paragraphs
+    number_of_paragraphs = len(paragraphs)
+
+    # print(number_of_paragraphs)
+    # print(paragraphs[2])
+
+
+
+    if(number_of_paragraphs>1):
+        translated_text = GoogleTranslator(sourc1e='auto', target=lang).translate(paragraphs[1])
+        return translated_text
+    else:
+        return ""    
+    # print(translated_text)
+         
+    
+
+
+def call_openai(user_prompt):
 
     thankyou_response = "Thank you for informing us. We understand the disturbance caused by loud parties. We've logged your complaint and will dispatch an officer. Please call us back if the noise persists or you have further concerns."
     keywords_dict ={
@@ -143,22 +176,20 @@ def call_openai(user_prompt,detected_language):
         Instructions:
         
         frame your response in the following format:
-
-        name of the department and corresponding phone number
  
         We have Redirected your call to [ name of the department ] Here is a quick dial number to the department: [corresponding phone number] 
         
         Thank you note.
 
-        Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "Please contact to the General Department."
+        Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "I couldn't understand what you meant, we are redirecting your call to Public Safety Department. Here is a quick dial number to the department:+555-0000."
         
         
         Here is the JSON with keywords and corresponding phone numbers: {}
     """.format(keywords_dict)
     
-    # "911 - Emergency response."
+    # name of the department and corresponding phone number "911 - Emergency response."
 
-    client = openai.OpenAI(api_key='sk-proj-X0w2xbGlI4IRZPWy15NeT3BlbkFJ2yQlG2X1qJdBSXsUoWYl')  # Ensure you provide your OpenAI API key
+    client = openai.OpenAI(api_key=open_ai_key)  # Ensure you provide your OpenAI API key
 
     completion = client.chat.completions.create(
         model="gpt-4-turbo",
@@ -175,7 +206,7 @@ def call_openai(user_prompt,detected_language):
     response_message = completion.choices[0].message.content
 
     
-    print(response_message)
+    # print(response_message)
     return response_message.strip()
 
 
