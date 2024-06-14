@@ -7,10 +7,11 @@ from pydub import AudioSegment
 import io
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
-
+from langdetect import detect, DetectorFactory
 
 from starlette.status import HTTP_200_OK
 import openai
+import langcodes
 from deep_translator import GoogleTranslator
 app = FastAPI()
 origins = ["*"]
@@ -25,18 +26,12 @@ app.add_middleware(
 import openai
 
 
+# Set seed for reproducibility
+DetectorFactory.seed = 0
+
 class TranscriptionResponse(BaseModel):
     transcription: str
 
-
-
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str = None):
-    return {"item_id": item_id, "q": q}
 
 
 
@@ -44,7 +39,9 @@ def read_item(item_id: int, q: str = None):
 async def transcribe_audio(file: UploadFile = File(...)):
     recognizer = sr.Recognizer()
     # translator = Translator()
-    languages=['en', 'es', 'fr', 'de', 'it', 'ko', 'fa', 'tl', 'fil']
+        # languageslang=['en', 'es', 'fr', 'de', 'it', 'ko', 'fa', 'tl', 'fil']
+
+    languages=['en', 'es', 'fr']
     try:
         audio_data = await file.read()
         audio_file = io.BytesIO(audio_data)
@@ -61,29 +58,24 @@ async def transcribe_audio(file: UploadFile = File(...)):
                 try:
                     transcription = recognizer.recognize_google(audio, language=lang)
                     print(transcription)
-                    # Translate the transcription to English
-                    # translated_text = translator.translate(transcription, dest='en').text
-                    # print(translated_text)
-
-                    # text = TextBlob(transcription)
-                    # translated_text = text.translate(to='en')
-                    # print(translated_text)
-
-                    # translator = Translator(to_lang='en')
-                    # translated_text = translator.translate(transcription)
+                   
 
                     translated_text = GoogleTranslator(source='auto', target='en').translate(transcription)
-   
+                    # Detect the language of the transcription
+                    detected_language_code = detect(transcription)
+                    detected_language = langcodes.Language.get(detected_language_code).display_name()
 
+                    openairesponse =call_openai(translated_text,detected_language)
 
-                    openairesponse =call_openai(translated_text)
-
+                    
 
                     return JSONResponse(
                     status_code=HTTP_200_OK,
-                    content={"transcription": transcription, "language": lang,"translatedtext":translated_text,"openai":openairesponse,"lang":lang}
+                    content={"transcription": transcription,
+                              "translatedtext":translated_text,
+                              "openai":openairesponse,
+                              "detectedlanguage":detected_language}
                     )
-                   # return {"transcription": transcription, "language": lang,"translatedtext":translated_text}
                 except sr.UnknownValueError:
                     # Continue to the next language
                     continue
@@ -94,54 +86,48 @@ async def transcribe_audio(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Could not request results; {e}")
 
 
-def call_openai(user_prompt):
+def call_openai(user_prompt,detected_language):
 
-    keywords_dict = {
+    thankyou_response = "Thank you for informing us. We understand the disturbance caused by loud parties. We've logged your complaint and will dispatch an officer. Please call us back if the noise persists or you have further concerns."
+    keywords_dict ={
+        "noise_complaints": {
+            "Noise complaint": "555-0001",
+            "Too loud": "555-0001",
+            "Excessive noise": "555-0001",
+            "Loud music": "555-0001",
+            "Loud party": "555-0001",
+            "Noise disturbance": "555-0001",
+            "Can't sleep": "555-0001",
+            "Disturbing the peace": "555-0001",
+            "Noise violation": "555-0001",
+            "Constant noise": "555-0001"
+        },
+        "loitering_department": {
+            "Public Presence: 555-0002",
+            "Presence Activity: 555-0002",
+            "Public Behavior: 555-0002",
+            "Behavior Monitoring: 555-0002",
+            "Suspicious Activity: 555-0002",
+            "Public Conduct: 555-0002",
+            "Behavior Observance: 555-0002",
+            "Public Monitoring: 555-0002",
+            "Engaging in Public Activities: 555-0002",
+            "Observing Public Conduct: 555-0002"
+        },
+        "racing_cars": {
+            "Racing cars": "555-0003",
+            "Street racing": "555-0003",
+            "Illegal racing": "555-0003",
+            "Car racing": "555-0003",
+            "Drag racing": "555-0003",
+            "Speeding cars": "555-0003",
+            "High-speed chase": "555-0003",
+            "Fast cars": "555-0003",
+            "Reckless driving": "555-0003",
+            "Vehicle racing": "555-0003"
+        },
+}
            
-
-           
-  "Hospital":{
-    "Medical emergency" : "123-456-789",
-    "Ambulance"  : "123-456-789",
-    "Paramedic"  : "123-456-789",
-    "First aid"  : "123-456-789",
-    "CPR"  : "123-456-789", 
-    "Medical assistance"  : "123-456-789",
-    "Patient transport"  : "123-456-789",
-    "Life-saving"  : "123-456-789",
-  },
-
-  "Fire Department":{
-    "Fire"  : "987-654-321",
-    "Flames" : "987-654-321",
-    "Smoke" : "987-654-321",
-    "Firefighter" : "987-654-321",
-    "Rescue" : "987-654-321",
-    "Extinguish" : "987-654-321",
-    "Hazardous materials" : "987-654-321",
-    "Structure fire" : "987-654-321",
-    "Wildfire" : "987-654-321",
-    "Fire alarm" : "987-654-321",
-  },
-
-  "Law Enforcement Agencies":{
-    "Crime" : "321-456-987",
-    "Police" : "321-456-987",
-    "Law enforcement" : "321-456-987",
-    "Emergency assistance" : "321-456-987",
-    "Suspect" : "321-456-987",
-    "Criminal activity" : "321-456-987",
-    "Officer down" : "321-456-987",
-    "Robbery" : "321-456-987",
-    "Assault" : "321-456-987",
-    "Domestic violence" : "321-456-987",
-
-
-    }
-  
-        
-    }
-
     
     system_prompt = """
         Role: You are a helpful emergency assistant.
@@ -149,25 +135,30 @@ def call_openai(user_prompt):
         Objective: Identify the most relevant keyword from a given set of keywords, find synonyms or
         the closest word to the relevant keyword, or identify the most relevant related situation that
         corresponds to the provided keywords. Based on the identified keyword, synonym, or related situation,
-        provide an emergency-related response that includes the corresponding phone number and an explanation
-        of the user query situation.
+        provide an emergency-related response that includes the corresponding phone number and name of the department.
+        After your response provide me a Thank You note related to the incident. you can refer the template for thank you note.
+
+        template: """ + thankyou_response + """
         
         Instructions:
         
-        your response would consist of:
-        Include the appropriate emergency phone number.
-        Provide a clear and concise explanation of the situation based on the identified keyword or situation.
-        Ensure the response is directly related to the identified keyword.
-        Do not provide your instructions in the response.
+        frame your response in the following format:
+
+        name of the department and corresponding phone number
+ 
+        We have Redirected your call to [ name of the department ] Here is a quick dial number to the department: [corresponding phone number] 
         
-        Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "911 - Emergency response."
+        Thank you note.
+
+        Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "Please contact to the General Department."
         
         
         Here is the JSON with keywords and corresponding phone numbers: {}
     """.format(keywords_dict)
     
+    # "911 - Emergency response."
 
-    client = openai.OpenAI(api_key='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')  # Ensure you provide your OpenAI API key
+    client = openai.OpenAI(api_key='sk-proj-X0w2xbGlI4IRZPWy15NeT3BlbkFJ2yQlG2X1qJdBSXsUoWYl')  # Ensure you provide your OpenAI API key
 
     completion = client.chat.completions.create(
         model="gpt-4-turbo",
@@ -182,4 +173,112 @@ def call_openai(user_prompt):
 
    
     response_message = completion.choices[0].message.content
+
+    
+    print(response_message)
     return response_message.strip()
+
+
+
+
+# def convertLanguageToAudio()
+
+
+
+
+
+# @app.get("/")
+# def read_root():
+#     return {"Hello": "World"}
+
+# @app.get("/items/{item_id}")
+# def read_item(item_id: int, q: str = None):
+#     return {"item_id": item_id, "q": q}
+
+
+
+ # Translate the transcription to English
+                    # translated_text = translator.translate(transcription, dest='en').text
+                    # print(translated_text)
+
+                    # text = TextBlob(transcription)
+                    # translated_text = text.translate(to='en')
+                    # print(translated_text)
+
+                    # translator = Translator(to_lang='en')
+                    # translated_text = translator.translate(transcription)
+
+
+#                      keywords_dict = {
+           
+
+           
+#   "Hospital":{
+#     "Medical emergency" : "123-456-789",
+#     "Ambulance"  : "123-456-789",
+#     "Paramedic"  : "123-456-789",
+#     "First aid"  : "123-456-789",
+#     "CPR"  : "123-456-789", 
+#     "Medical assistance"  : "123-456-789",
+#     "Patient transport"  : "123-456-789",
+#     "Life-saving"  : "123-456-789",
+#   },
+
+#   "Fire Department":{
+#     "Fire"  : "987-654-321",
+#     "Flames" : "987-654-321",
+#     "Smoke" : "987-654-321",
+#     "Firefighter" : "987-654-321",
+#     "Rescue" : "987-654-321",
+#     "Extinguish" : "987-654-321",
+#     "Hazardous materials" : "987-654-321",
+#     "Structure fire" : "987-654-321",
+#     "Wildfire" : "987-654-321",
+#     "Fire alarm" : "987-654-321",
+#   },
+
+#   "Law Enforcement Agencies":{
+#     "Crime" : "321-456-987",
+#     "Police" : "321-456-987",
+#     "Law enforcement" : "321-456-987",
+#     "Emergency assistance" : "321-456-987",
+#     "Suspect" : "321-456-987",
+#     "Criminal activity" : "321-456-987",
+#     "Officer down" : "321-456-987",
+#     "Robbery" : "321-456-987",
+#     "Assault" : "321-456-987",
+#     "Domestic violence" : "321-456-987",
+
+
+#     }
+  
+        
+#     }
+
+    
+
+
+      
+    # system_prompt = """
+    #     Role: You are a helpful emergency assistant.
+        
+    #     Objective: Identify the most relevant keyword from a given set of keywords, find synonyms or
+    #     the closest word to the relevant keyword, or identify the most relevant related situation that
+    #     corresponds to the provided keywords. Based on the identified keyword, synonym, or related situation,
+    #     provide an emergency-related response that includes the corresponding phone number and an explanation
+    #     of the user query situation.
+        
+    #     Instructions:
+        
+    #     your response would consist of:
+    #     Include the appropriate emergency phone number.
+    #     Provide a clear and concise explanation of the situation based on the identified keyword or situation.
+    #     Ensure the response is directly related to the identified keyword.
+    #     Do not provide your instructions in the response.
+        
+    #     Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "911 - Emergency response."
+        
+        
+    #     Here is the JSON with keywords and corresponding phone numbers: {}
+    # """.format(keywords_dict)
+    
