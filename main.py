@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException,APIRouter
+from fastapi import FastAPI, UploadFile, File, HTTPException,APIRouter,Form
 
 router = APIRouter()
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +12,7 @@ from langdetect import detect, DetectorFactory
 from starlette.status import HTTP_200_OK
 import openai
 import langcodes
+import json
 from deep_translator import GoogleTranslator
 from korean_romanizer.romanizer import Romanizer
 app = FastAPI()
@@ -40,18 +41,18 @@ class TranscriptionResponse(BaseModel):
 
 
 @app.post("/transcribe/", response_model=TranscriptionResponse)
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(file: UploadFile = File(...), chathistory: str = Form(None)):
     recognizer = sr.Recognizer()
     # translator = Translator()
         # languageslang=['en', 'es', 'fr', 'de', 'it', 'ko', 'fa', 'tl', 'fil']
 
     languages={
         'en-US': 'en', 
+        'es-ES': 'es',
         'fr-FR': 'fr',
         'ko-KR': 'ko', 
         'fa-IR': 'fa', 
         'fil-PH': 'tl',
-        'es-ES': 'es'
         }
     try:
         audio_data = await file.read()
@@ -76,7 +77,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
                     detected_language_code = detect(transcription)
                     detected_language = langcodes.Language.get(detected_language_code).display_name()
 
-                    openairesponse =call_openai(translated_text)
+                    openairesponse =call_openai(translated_text,chathistory)
 
                     if(openairesponse):
 
@@ -112,32 +113,34 @@ def convertTextToDetectedLanguage(openairesponse,detected_language,lang):
     # Check the number of paragraphs
     number_of_paragraphs = len(paragraphs)
 
-    # print(number_of_paragraphs)
-    # print(paragraphs[2])
+    translated_text = GoogleTranslator(source='auto', target=lang).translate(openairesponse)
+
+    return translated_text
 
 
-
-    if(number_of_paragraphs>1):
-        translated_text = GoogleTranslator(source='auto', target=lang).translate(paragraphs[1])
-        if(lang == 'ko'):
-
-
-            # Romanize Korean text to English transliteration
-            romanized_text = Romanizer(translated_text).romanize()
-
-            print(romanized_text)
-            translated_text=romanized_text
+    # if(number_of_paragraphs>1):
+    #     translated_text = GoogleTranslator(source='auto', target=lang).translate(paragraphs[1])
+    #     if(lang == 'ko'):
 
 
-        return translated_text
-    else:
-        return ""    
-    # print(translated_text)
+    #         # Romanize Korean text to English transliteration
+    #         romanized_text = Romanizer(translated_text).romanize()
+
+    #         print(romanized_text)
+    #         translated_text=romanized_text
+
+
+    #     return translated_text
+    # else:
+    #     return ""    
          
     
 
 
-def call_openai(user_prompt):
+def call_openai(user_prompt,chathistoryjsonstring):
+# Parse the JSON string
+    chat_history = json.loads(chathistoryjsonstring)
+
 
     thankyou_response = "Thank you for informing us. We understand the disturbance caused by loud parties. We've logged your complaint and will dispatch an officer. Please call us back if the noise persists or you have further concerns."
     keywords_dict ={
@@ -218,7 +221,8 @@ def call_openai(user_prompt):
     system_prompt = """
         Role: You are a helpful emergency assistant.
 
-        Objective: First, gather personal information from the user to ensure accurate and efficient assistance. Then, identify the most relevant keyword from a given set of keywords, find synonyms or
+        Objective: First, gather personal information from the user step by step to ensure accurate and efficient assistance. 
+        Then, identify the most relevant keyword from a given set of keywords, find synonyms or
         the closest word to the relevant keyword, or identify the most relevant related situation that
         corresponds to the provided keywords. Based on the identified keyword, synonym, or related situation,
         provide an emergency-related response that includes the corresponding phone number and name of the department.
@@ -228,13 +232,49 @@ def call_openai(user_prompt):
         
         Instructions:
         
-        First, ask the user for the following personal information:
-        1. Full Name
-        2. Contact Number
-        3. Address
-        4. Nature of the Emergency
+        . Ask additional questions based on the nature of the emergency to gather detailed information:
+   
+   a. **Nature of the Emergency**
+      - What is the nature of your emergency? (e.g., medical emergency, crime in progress, accident, suspicious activity)
+      - Is anyone in immediate danger? (e.g., Are there any injuries? Is there a threat to someone's life?)
 
-        Once the personal information is collected, frame your response in the following format:
+   b. **Location**
+      - What is the location of the emergency? (Exact address or nearest landmark)
+      - Where are you calling from? (If different from the location of the emergency)
+
+   c. **Time**
+      - When did the incident occur? (Is it happening now? Did it just happen? Has it been a while?)
+
+   d. **Detailed Information**
+      - Can you describe what happened? (Details of the incident)
+      - What actions have you taken so far? (e.g., Have you tried to leave the area? Have you contacted anyone else?)
+
+   e. **Suspect Information** (if applicable)
+      - Can you describe the suspect(s)? (Gender, age, race, clothing, distinguishing features)
+      - Do you know the suspect? (Is the suspect known to the victim?)
+      - Are there any weapons involved? (Type of weapon, if any)
+
+   f. **Vehicle Information** (if applicable)
+      - Can you describe the vehicle? (Make, model, color, license plate number)
+      - Which direction did the vehicle go? (Direction of travel if the suspect fled)
+
+   g. **Victim Information**
+      - Is anyone injured? (Nature and extent of injuries)
+      - Do you need medical assistance? (Is an ambulance required?)
+
+   h. **Caller Information**
+      - What is your name?
+      - What is your phone number? (In case the call gets disconnected or further contact is needed)
+      - Are you safe where you are? (Ensuring the caller’s safety)
+
+         
+        Collect each piece of information in sequence before proceeding to the next question.
+
+        
+
+
+
+        Once all the personal information is collected, frame your response in the following format:
         
         We have redirected your call to [name of the department]. Here is a quick dial number to the department: [corresponding phone number].
         
@@ -245,7 +285,22 @@ def call_openai(user_prompt):
         Here is the JSON with keywords and corresponding phone numbers: {}
     """.format(keywords_dict)
 
+
+
+    # Convert the chat history to the format required by OpenAI API
+    messages = [{"role": "system", "content": system_prompt}]
+    for entry in chat_history:
+        messages.append({"role": "user", "content": entry["transcription"]})
+        messages.append({"role": "assistant", "content": entry["openai"]})
+
+    # Add the current user prompt
+    messages.append({"role": "user", "content": user_prompt})
     
+
+    # Combine the chat history with the new user prompt
+    # messages = [{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": user_prompt}]
+    
+
     # system_prompt = """
     #     Role: You are a helpful emergency assistant.
         
@@ -287,10 +342,11 @@ def call_openai(user_prompt):
         temperature=0.1,
         max_tokens=500,
         top_p=0.8,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
+        messages=messages
+        # messages=[
+        #     {"role": "system", "content": system_prompt},
+        #     {"role": "user", "content": user_prompt}
+        # ]
     )
 
    
