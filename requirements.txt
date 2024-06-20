@@ -5,3 +5,6 @@ openai==1.33.0
 speechrecognition==3.10.4
 deep-translator==1.11.4
 pydub==0.25.1
+langdetect==1.0.9
+deep-tanslator==1.11.4
+langcodes==3.4.0s
