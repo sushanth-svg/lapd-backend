@@ -142,7 +142,7 @@ def call_openai(user_prompt,chathistoryjsonstring):
     chat_history = json.loads(chathistoryjsonstring)
 
 
-    thankyou_response = "Thank you for informing us. We understand the disturbance caused by loud parties. We've logged your complaint and will dispatch an officer. Please call us back if the noise persists or you have further concerns."
+    thankyou_response = "Thank you for informing us. We understand and We've logged your complaint and will dispatch an officer. Please call us back if the noise persists or you have further concerns."   
     keywords_dict ={
         "noise_complaints": {
             "Noise complaint": "555-0001",
