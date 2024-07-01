@@ -77,7 +77,7 @@ async def transcribe_audio(file: UploadFile = File(...), chathistory: str = Form
                     detected_language_code = detect(transcription)
                     detected_language = langcodes.Language.get(detected_language_code).display_name()
 
-                    openairesponse =call_openai(translated_text,chathistory)
+                    openairesponse =call_openai(transcription,chathistory)
 
                     if(openairesponse):
 
@@ -113,7 +113,7 @@ def convertTextToDetectedLanguage(openairesponse,detected_language,lang):
     # Check the number of paragraphs
     number_of_paragraphs = len(paragraphs)
 
-    translated_text = GoogleTranslator(source='auto', target=lang).translate(openairesponse)
+    translated_text = GoogleTranslator(source='auto', target='en').translate(openairesponse)
 
     return translated_text
 
