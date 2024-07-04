@@ -21,7 +21,7 @@ RUN pip3 install -r requirements.txt
 
 COPY . /app
 
-# CMD uvicorn --host=0.0.0.0 app.main:app
-CMD ["python", "main.py"]
+CMD uvicorn --host=0.0.0.0 main:app
+# CMD ["python", "main.py"]
 
 
