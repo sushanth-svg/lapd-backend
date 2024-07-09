@@ -10,12 +10,6 @@ RUN apt-get update -o Acquire::Retries=3 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# COPY poetry.lock pyproject.toml ./
-# RUN pip3 install poetry==1.0.* && \
-#     poetry config virtualenvs.create false && \
-#     poetry install --no-dev
-
-
 COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
 

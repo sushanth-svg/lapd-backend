@@ -337,7 +337,7 @@ def call_openai(user_prompt,chathistoryjsonstring):
    
     7. Once all the personal information is collected, frame your response in the following format:
    
-    We have redirected your call to [Generate a random American Name] at [name of the department]. Your ticket number is [Generate a random 7 digit number].
+    We have redirected your call to [Generate a random American Name] at [name of the department]. Your ticket number is [Generate a random 2 digit number].
    
     Thank you note.  
    
