@@ -70,7 +70,7 @@ async def transcribe_audio(file: UploadFile = File(...), chathistory: str = Form
                 try:
                     transcription = recognizer.recognize_google(audio, language=locale)
                     print(transcription)
-                   
+
 
                     translated_text = GoogleTranslator(source='auto', target='en').translate(transcription)
                     # Detect the language of the transcription
@@ -337,9 +337,9 @@ def call_openai(user_prompt,chathistoryjsonstring):
    
     7. Once all the personal information is collected, frame your response in the following format:
    
-    We have redirected your call to [Generate a random American Name] at [name of the department]. Your ticket number is [Generate a random 2 digit number].
+    We have redirected your call to [Please provide a random American Name here] at [name of the department]. Your ticket number is [Please provide a random 2 digit number here].
    
-    Thank you note.  
+        Thank you note.  
    
     Fallback Response: If no relevant keyword, synonym, or related situation is found, respond with "I couldn't understand what you meant, we are redirecting your call to the Public Safety Department. Here is a quick dial number to the department: +555-0000."
    
