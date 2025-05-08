@@ -48,6 +48,7 @@ async def transcribe_audio(file: UploadFile = File(...), chathistory: str = Form
 
     languages={
         'en-US': 'en', 
+        'hi-IN': 'hi',   # Hindi
         'es-ES': 'es',
         'fr-FR': 'fr',
         'ko-KR': 'ko', 
